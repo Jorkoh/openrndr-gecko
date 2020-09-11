@@ -1,4 +1,4 @@
-import gecko.BodyPartWithFeet
+import gecko.BodyPartWithLegs
 import org.openrndr.color.ColorRGBa
 import org.openrndr.draw.Drawer
 import org.openrndr.extra.compositor.compose
@@ -14,27 +14,16 @@ class WorldRenderer(private val drawer: Drawer) {
             drawer.stroke = ColorRGBa.BLACK
             drawer.fill = null
             World.gecko.bodyParts.forEachIndexed { index, bodyPart ->
-                if (bodyPart is BodyPartWithFeet) {
-                    drawer.fill = ColorRGBa.BLUE
-                    drawer.circle(bodyPart.feet[0].target, 10.0)
-                    drawer.circle(bodyPart.feet[1].target, 10.0)
+                if (bodyPart is BodyPartWithLegs) {
+                    for (leg in bodyPart.legs) {
+                        drawer.fill = ColorRGBa.BLUE
+                        drawer.circle(leg.stepTarget, 10.0)
+                        drawer.fill = if (leg.takingAStep) ColorRGBa.GREEN else ColorRGBa.RED
+                        drawer.circle(leg.footPosition, 10.0)
 
-                    if (bodyPart.feetDown == BodyPartWithFeet.FeetSide.LEFT) {
-                        drawer.fill = ColorRGBa.RED
-                    } else {
-                        drawer.fill = ColorRGBa.GREEN
+                        drawer.lineSegment(bodyPart.position, leg.jointPosition)
+                        drawer.lineSegment(leg.jointPosition, leg.footPosition)
                     }
-                    drawer.circle(bodyPart.feet[0].position, 10.0)
-                    if (bodyPart.feetDown == BodyPartWithFeet.FeetSide.RIGHT) {
-                        drawer.fill = ColorRGBa.RED
-                    } else {
-                        drawer.fill = ColorRGBa.GREEN
-                    }
-                    drawer.circle(bodyPart.feet[1].position, 10.0)
-
-                    drawer.lineSegment(bodyPart.position, bodyPart.feet[0].position)
-                    drawer.lineSegment(bodyPart.position, bodyPart.feet[1].position)
-
                     drawer.fill = ColorRGBa.YELLOW
                 } else {
                     drawer.fill = null
