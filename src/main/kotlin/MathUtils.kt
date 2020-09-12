@@ -25,7 +25,7 @@ fun Double.radiansAngleDifference(secondRadiansAngle: Double): Double {
     return (this - secondRadiansAngle + 9.42478) % 6.28319 - 3.14159
 }
 
-fun Vector2.clampRadiansAngleDifference(secondVector: Vector2, maxAngleDifference: Double): Vector2 {
+fun Vector2.clampAbsoluteRadiansAngleDifference(secondVector: Vector2, maxAngleDifference: Double): Vector2 {
     val secondAngle = secondVector.radiansAngle()
     val angleDifference = radiansAngle().radiansAngleDifference(secondAngle)
     return when {
@@ -34,6 +34,24 @@ fun Vector2.clampRadiansAngleDifference(secondVector: Vector2, maxAngleDifferenc
         }
         angleDifference < -maxAngleDifference -> {
             setRadiansAngle(secondAngle - maxAngleDifference)
+        }
+        else -> this
+    }
+}
+
+fun Vector2.clampRadiansAngleDifference(
+    secondVector: Vector2,
+    minAngleDifference: Double,
+    maxAngleDifference: Double
+): Vector2 {
+    val secondAngle = secondVector.radiansAngle()
+    val angleDifference = radiansAngle().radiansAngleDifference(secondAngle)
+    return when {
+        angleDifference > maxAngleDifference -> {
+            setRadiansAngle(secondAngle + maxAngleDifference)
+        }
+        angleDifference < minAngleDifference -> {
+            setRadiansAngle(secondAngle + minAngleDifference)
         }
         else -> this
     }

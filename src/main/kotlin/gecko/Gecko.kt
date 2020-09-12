@@ -1,22 +1,47 @@
 package gecko
 
 import clampLength
+import clampAbsoluteRadiansAngleDifference
 import clampRadiansAngleDifference
 import gecko.BodyPartWithLegs.Side.LEFT
 import gecko.BodyPartWithLegs.Side.RIGHT
-import gecko.Gecko.Companion.LEG_LENGTH
 import org.openrndr.math.Vector2
 import radiansAngle
 import setLength
 import toRadians
 import unitWithRadiansAngle
+import java.lang.Double.max
+import java.lang.Double.min
 
 class Gecko(private val spawnPosition: Vector2, var velocity: Vector2) {
     companion object {
         const val NUMBER_OF_BODY_PARTS = 14
         const val BODY_PART_SEPARATION = 30.0
 
-        val BODY_PARTS_WITH_FEET = listOf(2, 6)
+        val BODY_PARTS_WITH_LEGS_SETTINGS = listOf(
+            PartWithLegSettings(
+                2,
+                LEFT,
+                140.0,
+                50.0,
+                60.0,
+                40.0,
+                50.0,
+                5.0,
+                190.0
+            ),
+            PartWithLegSettings(
+                6,
+                RIGHT,
+                160.0,
+                60.0,
+                75.0,
+                120.0,
+                30.0,
+                -175.0,
+                -20.0
+            )
+        )
 
         // Maximum head turn per time step
         const val MAX_TURN = 5.0
@@ -25,15 +50,11 @@ class Gecko(private val spawnPosition: Vector2, var velocity: Vector2) {
         const val MAX_ANGLE_BETWEEN_PARTS = 40.0
 
         // TODO: make this variable depending on body part
-        // Length of each leg
-        const val LEG_LENGTH = 60.0
-
-        // TODO: make this variable depending on body part
         // Angle between the body part direction and the feet target of that body part
         const val FEET_TARGET_ANGLE = 40.0
 
         const val MINIMUM_SPEED = 0.0
-        const val MAXIMUM_SPEED = 3.0
+        const val MAXIMUM_SPEED = 4.0
 
         const val DRAG_FACTOR = 0.2
 
@@ -47,11 +68,10 @@ class Gecko(private val spawnPosition: Vector2, var velocity: Vector2) {
 
     val bodyParts = (1..NUMBER_OF_BODY_PARTS).map { partPosition ->
         val position = spawnPosition - velocity.normalized * (BODY_PART_SEPARATION * partPosition)
+        val legsSettings = BODY_PARTS_WITH_LEGS_SETTINGS.firstOrNull { partPosition == it.bodyPartIndex }
 
-        if (partPosition in BODY_PARTS_WITH_FEET) {
-            // If it's a part with feet alternate which feet is forward
-            val feetDown = if (BODY_PARTS_WITH_FEET.indexOf(partPosition) % 2 == 0) LEFT else RIGHT
-            BodyPartWithLegs(position, feetDown, -velocity)
+        if (legsSettings != null) {
+            BodyPartWithLegs(position, legsSettings, -velocity)
         } else {
             BodyPart(position)
         }
@@ -76,7 +96,7 @@ class Gecko(private val spawnPosition: Vector2, var velocity: Vector2) {
             newVelocity += force
         }
         velocity = newVelocity
-            .clampRadiansAngleDifference(velocity, MAX_TURN.toRadians())
+            .clampAbsoluteRadiansAngleDifference(velocity, MAX_TURN.toRadians())
             .clampLength(MINIMUM_SPEED, MAXIMUM_SPEED)
     }
 
@@ -106,21 +126,21 @@ class Gecko(private val spawnPosition: Vector2, var velocity: Vector2) {
                 // Adjust to avoid crossing over the body by clamping the angle between this part and the previous
                 val previousDirection = bodyParts[i - 1].position - bodyParts[i - 2].position
 
-                currentDirection = currentDirection.clampRadiansAngleDifference(
+                currentDirection = currentDirection.clampAbsoluteRadiansAngleDifference(
                     previousDirection,
                     MAX_ANGLE_BETWEEN_PARTS.toRadians()
                 )
             }
             part.position = bodyParts[i - 1].position + currentDirection.normalized * BODY_PART_SEPARATION
 
-            (part as? BodyPartWithLegs)?.moveFeet(currentDirection, velocity)
+            (part as? BodyPartWithLegs)?.moveLegs(currentDirection, velocity)
         }
     }
 }
 
 open class BodyPart(var position: Vector2)
 
-class BodyPartWithLegs(position: Vector2, takingAStepSide: Side, direction: Vector2) : BodyPart(position) {
+class BodyPartWithLegs(position: Vector2, val settings: PartWithLegSettings, direction: Vector2) : BodyPart(position) {
     enum class Side {
         LEFT,
         RIGHT
@@ -132,44 +152,34 @@ class BodyPartWithLegs(position: Vector2, takingAStepSide: Side, direction: Vect
         this.calculateStepTargets(direction)
 
         legs.forEachIndexed { index, leg ->
-            leg.takingAStep = index == takingAStepSide.ordinal
+            leg.moving = index == settings.startMovingSide.ordinal
 
             // Initial position of the feet
-            leg.footPosition = if (leg.takingAStep) {
-                // If it's taking a step put it behind
+            // TODO auto generate proper feet position by mirroring the target with the direction
+            leg.footPosition = if (leg.moving) {
                 val angleSign = if (index == LEFT.ordinal) -1 else +1
-                position + Vector2.unitWithRadiansAngle(
-                    direction.radiansAngle() - Gecko.FEET_TARGET_ANGLE.toRadians() * angleSign
-                ) * LEG_LENGTH
+                val angle = (-direction).radiansAngle() + settings.movingLegFootStartAngle.toRadians() * angleSign
+                position + Vector2.unitWithRadiansAngle(angle) * settings.movingLegFootStartSeparation
             } else {
-                // If it's not taking a step put it forward
                 leg.stepTarget
             }
 
+            // Initial position of the feet
+            // TODO auto generate proper joint positions
             leg.jointPosition = position + (leg.footPosition - position) / 2.0
         }
     }
 
-    fun moveFeet(direction: Vector2, velocity: Vector2) {
+    fun moveLegs(direction: Vector2, velocity: Vector2) {
         calculateStepTargets(direction)
 
-        // TODO on this version foot alternate but each side could be independent https://youtu.be/z_fmMD-Gazw?t=167
-        // If one feet is too far, set the other one down and start moving it towards the target
-        if (legs[LEFT.ordinal].footPosition.distanceTo(position) > LEG_LENGTH) {
-            legs[LEFT.ordinal].takingAStep = true
-            legs[RIGHT.ordinal].takingAStep = false
-        } else if (legs[RIGHT.ordinal].footPosition.distanceTo(position) > LEG_LENGTH) {
-            legs[RIGHT.ordinal].takingAStep = true
-            legs[LEFT.ordinal].takingAStep = false
-        }
-
-        legs.forEach { leg ->
-            val target = if (leg.takingAStep) {
+        legs.forEachIndexed { index, leg ->
+            val target = if (leg.moving) {
                 // If it's taking a step the target is to get close to the step target
                 if (leg.footPosition.distanceTo(leg.stepTarget) < velocity.length * 2) {
                     leg.stepTarget
                 } else {
-                    leg.footPosition + (leg.stepTarget - leg.footPosition).setLength(velocity.length * 2)
+                    leg.footPosition + (leg.stepTarget - leg.footPosition).setLength(velocity.length * 2.2)
                 }
             } else {
                 //
@@ -181,35 +191,68 @@ class BodyPartWithLegs(position: Vector2, takingAStepSide: Side, direction: Vect
             var newJointPosition = leg.jointPosition
             // Use do while because it needs to adjust the joint even when the foot is already
             // reaching the target since the body position also moves
+
+            var iterations = 0
             do {
-                // forwards, reaching target
-                newJointPosition = target + (newJointPosition - target).setLength(LEG_LENGTH / 2.0)
+                // Stage 1 forward reaching
+                newJointPosition = target + (newJointPosition - target).setLength(settings.legLength / 2.0)
 
-                // backwards, reaching body
-                newJointPosition = position + (newJointPosition - position).setLength(LEG_LENGTH / 2.0)
-                newFootPosition = newJointPosition + (target - newJointPosition).setLength(LEG_LENGTH / 2.0)
-            } while (newFootPosition.distanceTo(target) > 1.0)
+                // Stage 2 backward reaching
+                newJointPosition = position + (newJointPosition - position).setLength(settings.legLength / 2.0)
+                val angleSign = if (index == LEFT.ordinal) +1 else -1
+                val firstAngle = angleSign * settings.jointConstraintMinAngle.toRadians()
+                val secondAngle = angleSign * settings.jointConstraintMaxAngle.toRadians()
+                val constrainedDirection = (target - newJointPosition).clampRadiansAngleDifference(
+                    newJointPosition - position, min(firstAngle, secondAngle), max(firstAngle, secondAngle)
+                )
+                newFootPosition = newJointPosition + constrainedDirection.setLength(settings.legLength / 2.0)
+                iterations++
+            } while (newFootPosition.distanceTo(target) > 0.5 && iterations < 10)
 
-            leg.footPosition = newFootPosition
-            leg.jointPosition = newJointPosition
+            if (iterations == 10) {
+                // Can get close to the target through inverse kinematics, change stepping leg
+                switchMovingLeg()
+                leg.jointPosition = newJointPosition
+                leg.footPosition = newFootPosition
+            } else {
+                leg.jointPosition = newJointPosition
+                leg.footPosition = target
+            }
+        }
+    }
+
+    private fun switchMovingLeg() {
+        legs.forEach { leg ->
+            leg.moving = !leg.moving
         }
     }
 
     private fun calculateStepTargets(direction: Vector2) {
-        // TODO targets have to be wider (and not full leg length) on back
         legs[LEFT.ordinal].stepTarget = position + Vector2.unitWithRadiansAngle(
-            (-direction).radiansAngle() + Gecko.FEET_TARGET_ANGLE.toRadians()
-        ) * LEG_LENGTH
+            (-direction).radiansAngle() - settings.targetAngle.toRadians()
+        ) * settings.targetSeparation
 
         legs[RIGHT.ordinal].stepTarget = position + Vector2.unitWithRadiansAngle(
-            (-direction).radiansAngle() - Gecko.FEET_TARGET_ANGLE.toRadians()
-        ) * LEG_LENGTH
+            (-direction).radiansAngle() + settings.targetAngle.toRadians()
+        ) * settings.targetSeparation
     }
 }
 
 class Leg(
-    var takingAStep: Boolean = false,
+    var moving: Boolean = false,
     var stepTarget: Vector2 = Vector2.ZERO,
     var jointPosition: Vector2 = Vector2.ZERO,
     var footPosition: Vector2 = Vector2.ZERO
+)
+
+data class PartWithLegSettings(
+    val bodyPartIndex: Int,
+    val startMovingSide: BodyPartWithLegs.Side,
+    val movingLegFootStartAngle: Double,
+    val movingLegFootStartSeparation: Double,
+    val legLength: Double,
+    val targetAngle: Double,
+    val targetSeparation: Double,
+    val jointConstraintMinAngle: Double,
+    val jointConstraintMaxAngle: Double
 )

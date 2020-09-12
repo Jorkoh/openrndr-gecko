@@ -18,17 +18,15 @@ class WorldRenderer(private val drawer: Drawer) {
                     for (leg in bodyPart.legs) {
                         drawer.fill = ColorRGBa.BLUE
                         drawer.circle(leg.stepTarget, 10.0)
-                        drawer.fill = if (leg.takingAStep) ColorRGBa.GREEN else ColorRGBa.RED
+                        drawer.fill = if (leg.moving) ColorRGBa.GREEN else ColorRGBa.RED
                         drawer.circle(leg.footPosition, 10.0)
 
                         drawer.lineSegment(bodyPart.position, leg.jointPosition)
                         drawer.lineSegment(leg.jointPosition, leg.footPosition)
                     }
-                    drawer.fill = ColorRGBa.YELLOW
-                } else {
-                    drawer.fill = null
                 }
 
+                drawer.fill = null
                 drawer.circle(
                     bodyPart.position,
                     when (index) {
