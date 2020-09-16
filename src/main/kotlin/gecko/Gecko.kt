@@ -25,8 +25,8 @@ class Gecko(private val spawnPosition: Vector2, var velocity: Vector2) {
                 140.0,
                 50.0,
                 60.0,
-                40.0,
-                50.0,
+                45.0,
+                55.0,
                 5.0,
                 190.0
             ),
@@ -35,8 +35,8 @@ class Gecko(private val spawnPosition: Vector2, var velocity: Vector2) {
                 RIGHT,
                 160.0,
                 60.0,
-                75.0,
-                120.0,
+                85.0,
+                110.0,
                 30.0,
                 -175.0,
                 -20.0
@@ -48,10 +48,6 @@ class Gecko(private val spawnPosition: Vector2, var velocity: Vector2) {
 
         // Maximum angle "compression" between one part and the next
         const val MAX_ANGLE_BETWEEN_PARTS = 40.0
-
-        // TODO: make this variable depending on body part
-        // Angle between the body part direction and the feet target of that body part
-        const val FEET_TARGET_ANGLE = 40.0
 
         const val MINIMUM_SPEED = 0.0
         const val MAXIMUM_SPEED = 4.0

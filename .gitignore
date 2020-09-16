@@ -1,5 +1,7 @@
 application.log
 build
 out
+video
+ffmpegOutput.txt
 .idea
 .gradle

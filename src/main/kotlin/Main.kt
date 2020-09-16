@@ -1,5 +1,4 @@
 import org.openrndr.application
-import org.openrndr.ffmpeg.ScreenRecorder
 
 fun main() = application {
     configure {
